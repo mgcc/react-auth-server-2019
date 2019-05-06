@@ -1,14 +1,10 @@
 const mongoose = require('mongoose')
 const jwt = require('jsonwebtoken')
-const Cookies = require('universal-cookie')
 
 // get model registered earlier
 const User = mongoose.model('User')
 
-
 exports.signup = (req, res) => {
-  console.log('received signup request')
-
   const newUser = new User({
     name: req.body.name,
     email: req.body.email,
@@ -26,63 +22,57 @@ exports.login = (req, res) => {
   const email = req.body.email.trim()
   const password = req.body.password
 
-
-  console.log('recieved login request')
-  console.log(req.body)
-
   User.findOne({ email }, (err, user) => {
     // Check if email exists
     if (err || !user) {
-      // FAIL - User doesn't exist
+      // Scenario 1: FAIL - User doesn't exist
       return res.send({ success: false })
     }
 
-    // check if password matches
+    // Check if password matches
     user.comparePassword(password, (err, isMatch) => {
       if (err || !isMatch) {
-        // FAIL - Wrong password
+        // Scenario 2: FAIL - Wrong password
         return res.send({ success: false })
       }
 
-      // Everything checks out, time to create token
-
+      // Scenario 3: SUCCESS - time to create token
       const tokenPayload = {
         _id: user._id
       }
 
       const token = jwt.sign(tokenPayload, 'THIS_IS_A_SECRET')
 
-      // return token
-      return res.send({ success: true, token })
+      // Return token to front end
+      return res.send({ success: true, token, username: user.name })
     })
   })
-
 
 }
 
 exports.checkIfLoggedIn = (req, res) => {
-  console.log('COOKIES: ')
-  console.log(req.cookies)
-
   if (!req.cookies || !req.cookies.authToken) {
-    // no auth token
+    // Scenario 1: FAIL - No cookies / No auth token sent
     return res.send({ loggedIn: false })
   }
 
-  // validate token
+  // Validate token if found
   return jwt.verify(req.cookies.authToken, 'THIS_IS_A_SECRET', (err, decoded) => {
     if (err) {
+      // Scenario 2: FAIL - Error validating token
       return res.send({ loggedIn: false })
     }
 
     const userId = decoded._id
 
-    // check if user exists
+    // Check if user exists
     return User.findById(userId, (userErr, user) => {
       if (userErr || !user) {
+        // Scenario 3: FAIL - Failed to find user based on id inside token
         return res.send({ loggedIn: false })
       }
 
+      // Scenario 4: SUCCESS - Token and user data are valid
       return res.send({ loggedIn: true })
     })
   })
